@@ -9,6 +9,7 @@ permissions:
 concurrency:
   group: pages
   cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # 👇 sin cache para no requerir package-lock.json
       - run: npm install
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
@@ -32,3 +33,4 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
