@@ -142,7 +142,7 @@ export default function App() {
     input.type = "file";
     input.accept = "image/*";
     input.setAttribute("capture", "environment"); // iOS/Android
-    input.onchange = (e: any) => handleImageUpload(e);
+    input.onchange = (e: any) => handleNewUpload(e);
     // Permitir volver a elegir la misma foto
     (input as any).value = "";
     document.body.appendChild(input);
@@ -334,10 +334,17 @@ export default function App() {
 
   // Nuevo upload: archiva la imagen generada previa en historial
   const handleNewUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Si el usuario cancela (no selecciona/toma foto), no tocamos el estado
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    // Si había una imagen generada previa y aún no se archivó, archívala
     if (generated && generatedDataUrl && !addedToHistory) {
       const fecha = new Date().toLocaleDateString("es-ES", { year: "2-digit", month: "2-digit", day: "2-digit" });
       setHistory((prev) => [...prev, { image: generatedDataUrl, date: fecha, ref: lastRef || "-", store, ts: Date.now() }]);
     }
+
+    // Cargar nueva imagen y preparar el formulario
     handleImageUpload(e);
     setGenerated(false);
     setGeneratedDataUrl(null);
