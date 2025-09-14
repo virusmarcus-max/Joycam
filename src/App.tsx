@@ -1,6 +1,6 @@
 // Version 2.0 — FIX: cierre correcto de funciones y variables duplicadas
 import React, { useState, useRef, useEffect } from "react";
-import { FaCamera, FaUpload, FaTimes, FaWhatsapp, FaTelegram, FaInstagram, FaDownload, FaExpand, FaCompress } from "react-icons/fa";
+import { FaCamera, FaUpload, FaTimes, FaWhatsapp, FaDownload, FaExpand, FaCompress } from "react-icons/fa";
 
 // Tiendas (teléfono y WhatsApp distintos)
 const stores: Record<string, { address: string; password: string; phone: string; whatsapp: string }> = {
@@ -308,7 +308,12 @@ export default function App() {
 
   // Compartir / descargar
   const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-  const shareDataUrl = (platform: string, dataUrl: string) => {
+  const makeFileName = (name?: string) => {
+    const base = (name || 'joycam').toString().trim() || 'joycam';
+    const safe = base.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 60);
+    return `${safe}.png`;
+  };
+  const shareDataUrl = (platform: string, dataUrl: string, filename?: string) => {
     fetch(dataUrl)
       .then(res => res.blob())
       .then(b => {
@@ -322,7 +327,7 @@ export default function App() {
         if (platform === "download") {
           const a = document.createElement("a");
           const url = URL.createObjectURL(b);
-          a.href = url; a.download = "joycam.png";
+          a.href = url; a.download = makeFileName(filename);
           document.body.appendChild(a); a.click(); a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 5000);
           if (isIOS()) window.open(dataUrl, "_blank"); // iOS a veces ignora download
@@ -349,10 +354,10 @@ export default function App() {
       });
   };
 
-  const shareImage = (platform: string) => {
+  const shareImage = (platform: string, filename?: string) => {
     if (!canvasRef.current) return;
     const dataUrl = canvasRef.current.toDataURL();
-    shareDataUrl(platform, dataUrl);
+    shareDataUrl(platform, dataUrl, filename);
   };
 
   // Historial persistente por tienda en localStorage + retención 2 días
@@ -392,7 +397,7 @@ export default function App() {
           <option value="">Selecciona tu tienda</option>
           {Object.keys(stores).map((s) => (<option key={s} value={s}>{s}</option>))}
         </select>
-        <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 12, border: "1px solid #ddd" }} />
+        <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 10, border: "1px solid #ddd" }} />
         <button onClick={handleLogin} style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, backgroundColor: "#ff69b4", color: "white", fontWeight: 800 }}>Entrar</button>
       </div>
     </div>
@@ -439,7 +444,7 @@ export default function App() {
         {image && !generated && (
           <>
             <div style={{ position: "relative", display: "inline-block", marginTop: 6 }}>
-
+              
               <img src={image} alt="preview" style={{ width: 160, height: 160, objectFit: "cover", border: "1px solid #ddd", borderRadius: 8 }} />
               <button onClick={handleRemoveImage} style={{ position: "absolute", top: -8, right: -8, background: "red", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, display: "flex", justifyContent: "center", alignItems: "center" }}>
                 <FaTimes size={10} />
@@ -482,9 +487,7 @@ export default function App() {
         {generated && (
           <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 8 }}>
             <button type="button" onClick={() => shareImage("whatsapp")} onTouchStart={() => shareImage("whatsapp")} style={{ minWidth: 44, minHeight: 44 }} aria-label="Compartir por WhatsApp"><FaWhatsapp size={24} color="#25D366" /></button>
-            <button type="button" onClick={() => shareImage("telegram")} onTouchStart={() => shareImage("telegram")} style={{ minWidth: 44, minHeight: 44 }} aria-label="Compartir por Telegram"><FaTelegram size={24} color="#0088cc" /></button>
-            <button type="button" onClick={() => shareImage("instagram")} onTouchStart={() => shareImage("instagram")} style={{ minWidth: 44, minHeight: 44 }} aria-label="Compartir en Instagram"><FaInstagram size={24} color="#E1306C" /></button>
-            <button type="button" onClick={() => shareImage("download")} onTouchStart={() => shareImage("download")} style={{ minWidth: 44, minHeight: 44 }} aria-label="Descargar imagen"><FaDownload size={24} /></button>
+            <button type="button" onClick={() => shareImage("download", lastRef)} onTouchStart={() => shareImage("download", lastRef)} style={{ minWidth: 44, minHeight: 44 }} aria-label="Descargar imagen"><FaDownload size={24} /></button>
           </div>
         )}
 
@@ -496,9 +499,7 @@ export default function App() {
                 <div style={{ fontSize: 10, color: "#555", marginTop: 2, textAlign: "center" }}>{h.date} · Ref: {h.ref || "-"}</div>
                 <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 4 }}>
                   <button type="button" onClick={() => shareDataUrl("whatsapp", h.image)} onTouchStart={() => shareDataUrl("whatsapp", h.image)} title="Compartir WhatsApp" style={{ width: 34, height: 34, display: "grid", placeItems: "center" }} aria-label="Compartir WhatsApp"><FaWhatsapp size={16} color="#25D366" /></button>
-                  <button type="button" onClick={() => shareDataUrl("telegram", h.image)} onTouchStart={() => shareDataUrl("telegram", h.image)} title="Compartir Telegram" style={{ width: 34, height: 34, display: "grid", placeItems: "center" }} aria-label="Compartir Telegram"><FaTelegram size={16} color="#0088cc" /></button>
-                  <button type="button" onClick={() => shareDataUrl("instagram", h.image)} onTouchStart={() => shareDataUrl("instagram", h.image)} title="Compartir Instagram" style={{ width: 34, height: 34, display: "grid", placeItems: "center" }} aria-label="Compartir Instagram"><FaInstagram size={16} color="#E1306C" /></button>
-                  <button type="button" onClick={() => shareDataUrl("download", h.image)} onTouchStart={() => shareDataUrl("download", h.image)} title="Descargar" style={{ width: 34, height: 34, display: "grid", placeItems: "center" }} aria-label="Descargar"><FaDownload size={16} /></button>
+                  <button type="button" onClick={() => shareDataUrl("download", h.image, h.ref)} onTouchStart={() => shareDataUrl("download", h.image, h.ref)} title="Descargar" style={{ width: 34, height: 34, display: "grid", placeItems: "center" }} aria-label="Descargar"><FaDownload size={16} /></button>
                 </div>
               </div>
             ))}
@@ -508,3 +509,22 @@ export default function App() {
     </div>
   );
 }
+
+
+/* ===== Archivos mínimos para Web App/PWA (GitHub Pages) =====
+   1) public/manifest.webmanifest
+{
+  "name":"Joycam","short_name":"Joycam","start_url":".",
+  "display":"standalone","orientation":"portrait",
+  "background_color":"#ffffff","theme_color":"#ff1493",
+  "icons":[{"src":"icons/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icons/icon-512.png","sizes":"512x512","type":"image/png"}]
+}
+   2) public/sw.js
+const CACHE='joycam-v1';self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html','./manifest.webmanifest'])))});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))))});self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{const cp=res.clone();caches.open(CACHE).then(c=>c.put(e.request,cp));return res;})))});
+   3) index.html (Vite)
+<!doctype html><html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"/><meta name="theme-color" content="#ff1493"/><link rel="manifest" href="./manifest.webmanifest"/><link rel="apple-touch-icon" href="./icons/icon-192.png"/><title>Joycam</title></head><body><div id="root"></div><script type="module" src="./src/main.tsx"></script><script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));}</script></body></html>
+   4) vite.config.ts
+import { defineConfig } from 'vite';import react from '@vitejs/plugin-react';export default defineConfig({plugins:[react()],base:'/REPO_NAME/'});
+   5) package.json
+{ "name":"joycam-web","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build","preview":"vite preview --port 5173"},"dependencies":{"react":"^18.2.0","react-dom":"^18.2.0","react-icons":"^4.11.0"},"devDependencies":{"@vitejs/plugin-react":"^4.2.0","vite":"^5.0.0","typescript":"^5.2.0"}}
+   * Backend opcional (Express) para alojar fuera de GitHub Pages — ver ejemplo en siguiente mensaje si lo deseas. */
