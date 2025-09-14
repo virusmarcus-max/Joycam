@@ -9,8 +9,8 @@ const stores: Record<string, { address: string; password: string; phone: string;
   "Granada":  { address: "Calle Emperatriz Eugenia 3", password: "9062", phone: "958 000 333", whatsapp: "611 003 003" },
   "Malaga 1": { address: "Calle Mauricio Moro Pareto 3", password: "7340", phone: "952 000 444", whatsapp: "611 004 004" },
   "Malaga 2": { address: "Avenida Velasquez 31", password: "2185", phone: "952 000 555", whatsapp: "611 005 005" },
-  "Sevilla 1":{ address: "Calle Maria Auxiliadora 18", password: "6391", phone: "954 000 666", whatsapp: "630 61 08 93" },
-  "Sevilla 2":{ address: "Avenida Eduardo Dato 83", password: "5274", phone: "954 000 777", whatsapp: "626 58 77 72" },
+  "Sevilla 1":{ address: "Calle Maria Auxiliadora 18", password: "6391", phone: "954 410 112", whatsapp: "630 61 08 93" },
+  "Sevilla 2":{ address: "Avenida Eduardo Dato 83", password: "5274", phone: "954 921 197", whatsapp: "626 58 77 72" },
 };
 
 type HistoryItem = { image: string; date: string; ref: string; store: string; ts: number };
@@ -54,6 +54,12 @@ export default function App() {
   const [generatedDataUrl, setGeneratedDataUrl] = useState<string | null>(null);
   const [lastRef, setLastRef] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
+  const [genAnim, setGenAnim] = useState(false);
+  const [addedToHistory, setAddedToHistory] = useState(false);
+  const [showGenOverlay, setShowGenOverlay] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     const onFsChange = () => {
@@ -86,15 +92,36 @@ export default function App() {
 
   // Auth
   const handleLogin = () => {
-    if (store && password === stores[store].password) setLoggedIn(true);
-    else alert("Usuario o contraseña incorrecta");
+    if (!store || !password) {
+      setLoginError("Selecciona tu tienda e introduce la contraseña (4 dígitos).");
+      return;
+    }
+    if (password !== stores[store].password) {
+      setLoginError(`Contraseña incorrecta para ${store}.`);
+      return;
+    }
+    setLoginError(null);
+    // Animación antes de entrar al menú
+    setJustLoggedIn(true);
+    try { toggleFullscreen(); } catch (e) { /* no-op */ }
+    setTimeout(() => { setLoggedIn(true); setJustLoggedIn(false); }, 900);
   };
-  const handleLogout = () => {
+  const performLogout = () => {
     setLoggedIn(false);
     setPassword("");
     setStore("");
     resetWorkArea();
     setHistory([]);
+  };
+  const handleLogoutClick = () => {
+    const doc: any = document;
+    const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement);
+    if (isFs) {
+      try { (doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen)?.call(doc); } catch (e) { /* no-op */ }
+      setTimeout(() => performLogout(), 200);
+    } else {
+      performLogout();
+    }
   };
 
   // Reset
@@ -163,6 +190,10 @@ export default function App() {
 
   // Generación de imagen en canvas (CORREGIDO)
   const handleGenerate = () => {
+    setGenAnim(true);
+    if (!desc.trim() || !price.trim()) { setFormError("Rellena la Descripción y el Precio para generar la imagen."); setGenAnim(false); setShowGenOverlay(false); return; }
+    setFormError(null);
+    setShowGenOverlay(true);
     const canvas = canvasRef.current;
     if (!canvas || !image || !store) return;
     const ctx = canvas.getContext("2d");
@@ -283,20 +314,27 @@ export default function App() {
       const fechaCorta = new Date().toLocaleDateString("es-ES", { year: "2-digit", month: "2-digit", day: "2-digit" });
       ctx.save(); ctx.globalAlpha = 0.35; ctx.textAlign = "right"; ctx.font = "bold 14px Georgia, serif"; ctx.fillStyle = "#fff"; ctx.fillText(fechaCorta, canvas.width - 12, canvas.height - 12); ctx.restore();
 
+      // Añadir al historial inmediatamente con fecha + ref
+      const fecha = new Date().toLocaleDateString("es-ES", { year: "2-digit", month: "2-digit", day: "2-digit" });
+      const refHist = refCode || (tipo === "otros" ? brandModel : "");
+      const dataUrl = canvas.toDataURL();
+      setHistory((prev) => [...prev, { image: dataUrl, date: fecha, ref: refHist || "-", store, ts: Date.now() }]);
+      setAddedToHistory(true);
+
       setGenerated(true);
       setLoading(false);
-      const dataUrl = canvas.toDataURL();
+      setTimeout(() => setShowGenOverlay(false), 150);
       setGeneratedDataUrl(dataUrl);
       setLastRef(refCode || (tipo === "otros" ? brandModel : ""));
       // Reset para siguiente trabajo
-      setImage(null); setDesc(""); setGrams(""); setPrice(""); setRefCode(""); setBrandModel("");
+      setImage(null); setDesc(""); setGrams(""); setPrice(""); setRefCode(""); setBrandModel(""); setTimeout(() => setGenAnim(false), 700);
     };
     img.src = image;
   };
 
   // Nuevo upload: archiva la imagen generada previa en historial
   const handleNewUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (generated && generatedDataUrl) {
+    if (generated && generatedDataUrl && !addedToHistory) {
       const fecha = new Date().toLocaleDateString("es-ES", { year: "2-digit", month: "2-digit", day: "2-digit" });
       setHistory((prev) => [...prev, { image: generatedDataUrl, date: fecha, ref: lastRef || "-", store, ts: Date.now() }]);
     }
@@ -304,6 +342,7 @@ export default function App() {
     setGenerated(false);
     setGeneratedDataUrl(null);
     setLastRef("");
+    setAddedToHistory(false);
   };
 
   // Compartir / descargar
@@ -393,17 +432,26 @@ export default function App() {
         <h1 style={{ margin: 0, fontSize: 40, fontWeight: 800, letterSpacing: 1 }}>Joycam</h1>
       </div>
       <div style={{ width: "100%", maxWidth: 420 }}>
-        <select value={store} onChange={(e) => setStore(e.target.value)} style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 10, border: "1px solid #ddd" }}>
+        <select value={store} onChange={(e) => { setStore(e.target.value); setLoginError(null); }} style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 10, border: "1px solid #ddd" }}>
           <option value="">Selecciona tu tienda</option>
           {Object.keys(stores).map((s) => (<option key={s} value={s}>{s}</option>))}
         </select>
-        <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 10, border: "1px solid #ddd" }} />
+        <input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="Contraseña (4 dígitos)" value={password} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, '').slice(0,4); setPassword(v); setLoginError(null); }} style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 10, border: "1px solid #ddd" }} />
         <button onClick={handleLogin} style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, backgroundColor: "#ff69b4", color: "white", fontWeight: 800 }}>Entrar</button>
+        {loginError && (<div style={{ marginTop: 8, background: "#ffe4e9", color: "#b00020", border: "1px solid #ffcdd2", borderRadius: 8, padding: "8px 10px", fontSize: 12 }}>{loginError}</div>)}
       </div>
+    {justLoggedIn && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(255,255,255,0.9)", display: "grid", placeItems: "center", zIndex: 30, animation: "logoSplash 900ms ease forwards" }}>
+          <JoycamLogoIcon size={110} />
+        </div>
+      )}
     </div>
   ) : (
     <div style={{ fontFamily: "'Trebuchet MS', sans-serif", textAlign: "center", padding: 12, backgroundColor: "#fff", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <style>{`@keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} } body, html, #root { height: 100%; }`}</style>
+      <style>{`@keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+      @keyframes pulsePop { 0%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(255,105,180,.5);} 50%{ transform: scale(1.06);} 100%{ transform: scale(1); box-shadow: 0 0 0 12px rgba(255,105,180,0);} }
+      @keyframes logoSplash { 0%{ transform: scale(.8); opacity: 0;} 60%{ transform: scale(1.05); opacity: 1;} 100%{ transform: scale(1); opacity: 0;} }
+      body, html, #root { height: 100%; }`}</style>
 
       <header style={{ position: "sticky", top: 0, zIndex: 10, backgroundColor: "#ff1493", color: "white", padding: 12, marginBottom: 12, display: "flex", alignItems: "center" }}>
         {/* Izquierda: logo + nombre app */}
@@ -414,29 +462,51 @@ export default function App() {
         {/* Centro: tienda + dirección centradas */}
         <div style={{ flex: 1, textAlign: "center", lineHeight: 1.15 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>{store}</div>
-          <div style={{ fontSize: 11, opacity: 0.95 }}>{stores[store].address}</div>
-        </div>
+          </div>
         {/* Derecha: fullscreen + salir */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={toggleFullscreen} title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"} style={{ background: "#fff", color: "#ff1493", border: "none", borderRadius: 8, width: 36, height: 36, display: "grid", placeItems: "center" }} aria-label="Pantalla completa">
             {isFullscreen ? <FaCompress size={16} /> : <FaExpand size={16} />}
           </button>
-          <button onClick={handleLogout} style={{ background: "#fff", color: "#ff1493", border: "none", borderRadius: 8, padding: "6px 10px", fontWeight: 800 }}>Salir</button>
+          <button onClick={handleLogoutClick} style={{ background: "#fff", color: "#ff1493", border: "none", borderRadius: 8, padding: "6px 10px", fontWeight: 800 }}>Salir</button>
         </div>
       </header>
+
+      {/* Overlay de transición al entrar */}
+      {justLoggedIn && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(255,255,255,0.9)", display: "grid", placeItems: "center", zIndex: 20, animation: "logoSplash 900ms ease forwards" }}>
+          <JoycamLogoIcon size={110} />
+        </div>
+      )}
+
+      {showGenOverlay && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "grid", placeItems: "center", zIndex: 25 }}>
+          <div style={{ background: "#fff", padding: 20, borderRadius: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            <JoycamLogoIcon size={72} />
+            <div style={{ marginTop: 6 }}><div style={{ border: "4px solid #eee", borderTop: "4px solid #ff69b4", borderRadius: "50%", width: 30, height: 30, animation: "spin 1s linear infinite" }} /></div>
+            <div style={{ fontWeight: 700, color: "#ff1493" }}>Generando imagen…</div>
+          </div>
+        </div>
+      )}
 
       <main style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, alignItems: "center" }}>
         {!image && (
           <>
             <p style={{ color: "#777", margin: 0 }}>Añade una foto para empezar</p>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
-              <button type="button" onClick={handleOpenCamera} onTouchStart={handleOpenCamera} style={{ width: 56, height: 56, backgroundColor: "#ff69b4", color: "white", border: "none", borderRadius: 12, display: "flex", justifyContent: "center", alignItems: "center" }}>
-                <FaCamera size={24} />
-              </button>
-              <label style={{ width: 56, height: 56, backgroundColor: "#ff69b4", color: "white", borderRadius: 12, display: "flex", justifyContent: "center", alignItems: "center", cursor: "pointer" }}>
-                <FaUpload size={24} />
-                <input type="file" accept="image/*" onChange={handleNewUpload} style={{ display: "none" }} />
-              </label>
+            <div style={{ display: "flex", gap: 20, justifyContent: "center", marginTop: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <button type="button" onClick={handleOpenCamera} onTouchStart={handleOpenCamera} style={{ width: 72, height: 72, backgroundColor: "#ff69b4", color: "white", border: "none", borderRadius: 12, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                  <FaCamera size={28} />
+                </button>
+                <div style={{ fontSize: 12, marginTop: 6, color: "#555" }}>Abrir cámara</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <label style={{ width: 72, height: 72, backgroundColor: "#ff69b4", color: "white", borderRadius: 12, display: "flex", justifyContent: "center", alignItems: "center", cursor: "pointer" }}>
+                  <FaUpload size={28} />
+                  <input type="file" accept="image/*" onChange={handleNewUpload} style={{ display: "none" }} />
+                </label>
+                <div style={{ fontSize: 12, marginTop: 6, color: "#555" }}>Subir imagen</div>
+              </div>
             </div>
           </>
         )}
@@ -459,23 +529,25 @@ export default function App() {
 
             {/* Formularios */}
             <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 8 }}>
-              <input placeholder="Descripción" value={desc} onChange={(e) => setDesc(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+              <input placeholder="Descripción" value={desc} onChange={(e) => { setDesc(e.target.value); setFormError(null); }} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
               {tipo === "joyeria" ? (
                 <>
-                  <input placeholder="Gramos" value={grams} onChange={(e) => setGrams(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
-                  <input placeholder="Precio" value={price} onChange={(e) => setPrice(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+                  <input placeholder="Gramos" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={grams} onChange={(e) => { let v = e.target.value.replace(/[^0-9.,]/g, ''); const i = v.search(/[.,]/); if (i !== -1) { v = v.slice(0, i+1) + v.slice(i+1).replace(/[.,]/g, ''); } setGrams(v); }} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+                  <input placeholder="Precio" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={price} onChange={(e) => { let v = e.target.value.replace(/[^0-9.,]/g, ''); const i = v.search(/[.,]/); if (i !== -1) { v = v.slice(0, i+1) + v.slice(i+1).replace(/[.,]/g, ''); } setPrice(v); setFormError(null); }} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
                   <input placeholder="Referencia" value={refCode} onChange={(e) => setRefCode(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
                 </>
               ) : (
                 <>
                   <input placeholder="Marca y modelo" value={brandModel} onChange={(e) => setBrandModel(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
                   <input placeholder="Referencia" value={refCode} onChange={(e) => setRefCode(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
-                  <input placeholder="Precio" value={price} onChange={(e) => setPrice(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+                  <input placeholder="Precio" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={price} onChange={(e) => { let v = e.target.value.replace(/[^0-9.,]/g, ''); const i = v.search(/[.,]/); if (i !== -1) { v = v.slice(0, i+1) + v.slice(i+1).replace(/[.,]/g, ''); } setPrice(v); setFormError(null); }} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
                 </>
               )}
             </div>
 
-            <button onClick={handleGenerate} disabled={loading} style={{ width: 100, height: 100, marginTop: 8, backgroundColor: loading ? "#ccc" : "#ff69b4", border: "none", borderRadius: 20, display: "flex", justifyContent: "center", alignItems: "center" }}>
+            {formError && (<div style={{ marginTop: 6, background: "#ffe4e9", color: "#b00020", border: "1px solid #ffcdd2", borderRadius: 8, padding: "8px 10px", fontSize: 12 }}>{formError}</div>)}
+            <p style={{ marginTop: 6, color: "#777", fontSize: 12 }}>Rellena el formulario y pulsa para generar con Joycam</p>
+            <button onClick={handleGenerate} disabled={loading || !desc.trim() || !price.trim()} style={{ width: 100, height: 100, marginTop: 8, backgroundColor: (!desc.trim() || !price.trim()) ? "#ddd" : (loading ? "#ccc" : "#ff69b4"), border: "none", borderRadius: 20, display: "flex", justifyContent: "center", alignItems: "center", animation: genAnim ? "pulsePop 700ms ease-in-out" : undefined, boxShadow: genAnim ? "0 0 0 6px rgba(255,105,180,0.25)" : undefined, cursor: (!desc.trim() || !price.trim()) ? "not-allowed" : "pointer", opacity: (!desc.trim() || !price.trim()) ? 0.85 : 1 }}>
               {loading ? <Spinner /> : <JoycamLogoIcon size={56} />}
             </button>
           </>
@@ -491,6 +563,7 @@ export default function App() {
           </div>
         )}
 
+        <div style={{ width: "100%", maxWidth: 420, textAlign: "left", fontWeight: 700, marginTop: 12 }}>Imágenes generadas:</div>
         {history.filter(h => h.store === store).length > 0 && (
           <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, 90px)", gap: 10, justifyContent: "center", width: "100%", maxWidth: 420 }}>
             {history.filter(h => h.store === store).map((h, idx) => (
