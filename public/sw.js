@@ -1,4 +1,4 @@
-const CACHE='joycam-v4';
+const CACHE='joycam-v5';
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html','./manifest.webmanifest'])));
 });
