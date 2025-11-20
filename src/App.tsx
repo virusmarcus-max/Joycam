@@ -1,10 +1,10 @@
-// Version 2.0 — FIX: cierre correcto de funciones y variables duplicadas
+// Version 3.0 — FIX: cierre correcto de funciones y variables duplicadas
 import React, { useState, useRef, useEffect } from "react";
 import { FaCamera, FaUpload, FaTimes, FaWhatsapp, FaDownload, FaExpand, FaCompress } from "react-icons/fa";
 
 // Tiendas (teléfono y WhatsApp distintos)
 const stores: Record<string, { address: string; password: string; phone: string; whatsapp: string }> = {
-  "Cordoba":  { address: "Calle los Omeyas 1", password: "4829", phone: "957 000 111", whatsapp: "611 001 001" },
+  "Cordoba":  { address: "Calle los Omeyas 1", password: "4829", phone: "957 233 018", whatsapp: "689 422 282" },
   "Jerez":    { address: "Calle Medina 4", password: "1573", phone: "956 000 222", whatsapp: "611 002 002" },
   "Granada":  { address: "Calle Emperatriz Eugenia 3", password: "9062", phone: "958 000 333", whatsapp: "611 003 003" },
   "Malaga 1": { address: "Calle Mauricio Moro Pareto 3", password: "7340", phone: "952 000 444", whatsapp: "611 004 004" },
